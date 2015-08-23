@@ -58,16 +58,29 @@ def rearrangecategories(prefixes,categories) :
 
 cats = rearrangecategories([],getcategories(conn))            
     
-def getItems (conn, idMenu) :
-    conn.request("POST",
-                 "/ajaxpro/_MasterPages_Home,DiviComprasWeb.ashx?method=MostrarGondola",
-                 '{"idMenu": ' + str(idMenu) + '}',
-                 {
-                     "X-AjaxPro-Method": "MostrarGondola",
-                     "User-Agent": "MyAgent",
-                     "Cookie": cookie
-                 }
-                )
+def getItems (conn, idMenu, pageNum = 1) :
+    if(pageNum < 2):
+        conn.request("POST",
+                     "/ajaxpro/_MasterPages_Home,DiviComprasWeb.ashx?method=MostrarGondola",
+                     '{"idMenu": ' + str(idMenu) + '}',
+                     {
+                         "X-AjaxPro-Method": "MostrarGondola",
+                         "User-Agent": "MyAgent",
+                         "Cookie": cookie
+                     }
+                    )
+    else:
+        conn.request("POST",
+                     "/ajaxpro/_MasterPages_Home,DiviComprasWeb.ashx?method=PecActualizar",
+                     '{"pecActualizarFuncion":0,"pecControlUniqueID":"","pecTablaOrden":1,"pecTablaElementoOrden":0,"pecOpcion":1,"textoBusqueda":"",'
+                     + '"idMenu":' + str(idMenu) + ',"idPromo":0,"idPECListaCompraParametro":0,"idPedido":0,"sortDirection":0,"sortExpresion":14,'
+                     + '"paginacion":20,"paginaActual":' + str(pageNum) + ',"idMiLista":0,"visualizarFotosArticulos":true}',
+                     {
+                         "X-AjaxPro-Method": "PecActualizar",
+                         "User-Agent": "MyAgent",
+                         "Cookie": cookie
+                     }
+                    )
     resp = conn.getresponse()
     data = resp.read()
     data = data[1:len(data)-4]
@@ -77,7 +90,10 @@ def getItems (conn, idMenu) :
     data = data.replace(b"\\\"",b"\"")
     return data
 
-def processcategory(catnum) :
+def processitem(catname, itemname, itemunitprice, itemprice):
+    print("Categoria:{}, Nombre: {}, Unidad: {}, Precio: {}".format(nombreitem,unidadprecioitem,precio))
+
+def processcategory(catnum,catname='') :
     items = getItems(conn, catnum)
     tree = etree.fromstring(str(items.replace(b"\r",b"").replace(b"\t",b"").replace(b"\n",b"").replace(b"&nbsp;",b"").replace(b"<BR>",b"<BR />"),'utf-8'))
     trs = tree.findall(".//tr[@class='filaListaDetalle']")
@@ -98,4 +114,14 @@ def processcategory(catnum) :
         nombreitem = tr[2][0].text
         unidadprecioitem = tr[2][2].text
         precio = tr[6].text
-        print("Nombre: {}, Unidad {}, Precio {}".format(nombreitem,unidadprecioitem,precio))
+        processitem(catname,nombreitem,unidadprecioitem,precio)
+    for otherpage in [x for x in range(2,pages+1)]:
+        items = getItems(conn, catnum,otherpage)
+        tree = etree.fromstring(str(items.replace(b"\r",b"").replace(b"\t",b"").replace(b"\n",b"").replace(b"&nbsp;",b"").replace(b"<BR>",b"<BR />"),'utf-8'))
+        trs = tree.findall(".//tr[@class='filaListaDetalle']")
+        for tr in trs:
+            #lxml.etree.ElementTree.tostring(trs[0][2][0])
+            nombreitem = tr[2][0].text
+            unidadprecioitem = tr[2][2].text
+            precio = tr[6].text
+            processitem(catname,nombreitem,unidadprecioitem,precio)
